@@ -1,0 +1,26 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the Docker image
+        run: docker build . --file ./.devcontainer/Dockerfile --tag mpags-cpp:$(date +%Y.%m.%d)
+
+      - name: Configure the build
+        run: docker run -v $PWD:/workspace --rm mpags-cpp:$(date +%Y.%m.%d) cmake -S /workspace/src -B /workspace/build
+
+      - name: Run the build
+        run: docker run -v $PWD:/workspace --rm mpags-cpp:$(date +%Y.%m.%d) cmake --build /workspace/build
+
+      - name: Run unit tests
+        run: docker run -v $PWD:/workspace --rm -w /workspace/build mpags-cpp:$(date +%Y.%m.%d) ctest
