@@ -123,6 +123,22 @@ ProgramSettings processCommandLine(const std::vector<std::string>& cmdLineArgs)
                 }
                 ++i;
             }
+        } else if(cmdLineArgs[i] == "--threads") {
+
+            if(i == nCmdLineArgs - 1){
+                throw MissingArgument{"--threads requires a positive integer"};
+            } else{
+                const std::string& arg{cmdLineArgs[i+1]};
+
+                if(arg.front() == '-'){
+                    throw InvalidArgument{"--threads requires a positive integer"};
+                } else {
+
+                settings.nThreads = std::stoul(arg);
+
+                ++i;
+                }
+            }
         } else {
             // Have encoutered an unknown flag, so throw the corresponding exception
             throw UnknownArgument{"unknown argument '" + cmdLineArgs[i] + "'"};
