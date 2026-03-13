@@ -9,6 +9,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <future>
+#include <chrono>
+#include <thread>
 
 int main(int argc, char* argv[])
 {
@@ -66,6 +69,8 @@ int main(int argc, char* argv[])
             << "                      Will use the cipher to encrypt the input text (default behaviour)\n\n"
             << "  --decrypt\n"
             << "                      Will use the cipher to decrypt the input text\n\n"
+            << "  --threads N\n"
+            << "                      Number of threads to use for Caesar cipher (default = hardware cores or length of input text whichever is smaller)\n\n"
             << std::endl;
         // Help requires no further action, so return from main
         // with 0 used to indicate success
@@ -107,6 +112,19 @@ int main(int argc, char* argv[])
         }
     }
 
+    /// Setting nThreads
+    std::size_t nThreads = settings.nThreads;
+
+    if(nThreads == 0){
+        nThreads = std::thread::hardware_concurrency();
+    }
+
+    if(nThreads == 0){
+        nThreads = 2;
+    }
+
+    nThreads = std::min(nThreads, cipherText.size());
+
     // Request construction of the appropriate cipher(s)
     std::vector<std::unique_ptr<Cipher>> ciphers;
     std::size_t nCiphers{settings.cipherType.size()};
@@ -135,7 +153,60 @@ int main(int argc, char* argv[])
 
     // Run the cipher(s) on the input text, specifying whether to encrypt/decrypt
     for (const auto& cipher : ciphers) {
-        cipherText = cipher->applyCipher(cipherText, settings.cipherMode);
+
+        // Only parallelise Caesar
+        if(settings.cipherType[0] == CipherType::Caesar){
+
+            std::vector<std::future<std::string>> futures;
+            futures.reserve(nThreads);
+
+            std::size_t textLength = cipherText.size();
+            std::size_t chunkSize = textLength / nThreads;
+
+            for(std::size_t i = 0; i < nThreads; ++i){
+
+                std::size_t start = i * chunkSize;
+
+                std::size_t end;
+                if(i == nThreads - 1){
+                    end = textLength;
+                } else {
+                    end = start + chunkSize;
+                }
+
+                std::string chunk = cipherText.substr(start, end - start);
+                //std::cout << chunk << std::endl; // Used for debugging
+
+                futures.push_back(
+                    std::async(std::launch::async,
+                        [&cipher, &settings, chunk]()
+                        {
+                            return cipher->applyCipher(chunk, settings.cipherMode);
+                        }
+                    )
+                );
+            }
+
+            // Wait for threads to finish
+            for(auto& f : futures){
+                f.wait();
+            }
+
+            // Combine results
+            std::string result;
+            result.reserve(cipherText.size());
+
+            for(auto& f : futures){
+                result += f.get();
+            }
+
+            cipherText = result;
+
+        }
+        else{
+            // Non-Caesar ciphers run sequentially
+            cipherText = cipher->applyCipher(cipherText, settings.cipherMode);
+        }
     }
 
     // Output the encrypted/decrypted text to stdout/file

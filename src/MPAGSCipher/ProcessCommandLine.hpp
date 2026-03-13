@@ -32,6 +32,8 @@ struct ProgramSettings {
     std::vector<CipherType> cipherType;
     /// Flag indicating the mode in which the cipher should run (i.e. encrypt or decrypt)
     CipherMode cipherMode{CipherMode::Encrypt};
+    /// Flag to set number of threads used
+    std::size_t nThreads{0};
 };
 
 /**
